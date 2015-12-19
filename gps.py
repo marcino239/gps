@@ -57,14 +57,15 @@ class GPS( object ):
 		# estimate linear controllers
 		estimated_linear_controllers = self.estimate_linear_controllers( xu_train )
 
-		# optimise supervised learning
-
-		# optimise linear controllers using LQR
 		lqr = LQR( self.x_len, self.u_len )
-		linear_controllers = lqr.LQR( xu_train, estimated_linear_controllers, system_cost, 1.0 )		# TODO add lagrange multipliers
 
-		# update Lagrange multipliers
+		for k in range( gps_params[ 'K'] ):
+			# optimise supervised learning
 
+			# optimise linear controllers using LQR
+			linear_controllers = lqr.LQR( xu_train, estimated_linear_controllers, system_cost, 1.0 )		# TODO add lagrange multipliers
+
+			# update Lagrange multipliers
 
 		return policy
 		

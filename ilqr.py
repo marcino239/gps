@@ -1,6 +1,7 @@
 import numpy as np
 import numdifftools as ndt
 
+from utils import Lin_Gaussian_Controller
 
 class LQR( object ):
 	def __init__( self, x_len, u_len ):
@@ -31,11 +32,12 @@ class LQR( object ):
 		"""
 
 		get_x   = lambda xu: xu[ :self.x_len ]
-		get_u   = lambda xu: xu[ self.x_len, : ]
+		get_u   = lambda xu: xu[ self.x_len: ]
 		get_x_x = lambda xu: xu[ :self.x_len, :self.x_len ]
 		get_u_u = lambda xu: xu[ self.x_len:, self.x_len: ]
 		get_u_x = lambda xu: xu[ self.x_len:, :self.x_len ]			# TODO - check this, need to return x
-		get_xu  = lambda x, u: np.concatenate( (x,u) )
+		get_xu  = lambda x, u: np.concatenate( [x,u] )
+		get_ux  = lambda x, u: np.concatenate( [u,x] )
 
 
 		# TODO - where is this in the loop
@@ -89,20 +91,18 @@ class LQR( object ):
 
 			return l, lx, lx_x, lxu, lxu_xu
 
-		import ipdb
-		ipdb.set_trace()
-
 		T = xu_vec.shape[1] - 1
 		l, lx, lx_x, lxu, lxu_xu = l_star( system_cost, ni, lin_regs_estimated[ T ] )
 
 		Vx     = [ None ] * (T+2)
 		Vx_x   = [ None ] * (T+2)
-		Qxu_xu = [ None ] * T
-		Qxu    = [ None ] * T
-		Qu_u_i = [ None ] * T
-		Qux    = [ None ] * T
-		k      = [ None ] * T
-		K      = [ None ] * T
+		Qxu_xu = [ None ] * (T+1)
+		Qxu    = [ None ] * (T+1)
+		Qx_x   = [ None ] * (T+1)
+		Qu_u_i = [ None ] * (T+1)
+		Qu_x   = [ None ] * (T+1)
+		k      = [ None ] * (T+1)
+		K      = [ None ] * (T+1)
 		lin_controllers = [ None ] * (T+1)
 
 		# initialise gradients of V
@@ -128,16 +128,16 @@ class LQR( object ):
 			Qxu_xu[t] = lxu_xut + fxu_t.T.dot( Vx_x[t+1] ).dot( fxu_t )
 			Qu_u_i[t] = np.linalg.inv( get_u_u( Qxu_xu[t] ) )
 			Qx_x[t]   = get_x_x( Qxu_xu[t] )
+			Qu_x[t]   = get_u_x( Qxu_xu[t] )
 
 			#	Q xut = l_xut + f_xut V_xt+1
-			Qxu[t] = lxu( xu ) + fxu_t.T.dot( Vx[t+1] )
-			Qux[t] = np.concat( (get_u( Qxu[t] ), get_x( Qxu[t] )) )
-						
+			Qxu[t] = lxu( xu_t ) + fxu_t.T.dot( Vx[t+1] )
+
 			#	V_x,xt = Q_x,xt - Q_u,xt^T Q_u,ut^-1 Q_u,xt
 			Vx_x[t] = Qx_x[t] - Qu_x[t].T.dot( Qu_u_i[t] ).dot( Qu_x[t] )
 
 			#	V_xt = Q_xt - Qu,xt^T Q_u,ut^-1 Q ut
-			Vx[t] = get_x( Qxu_xu[t] ) - get_u_x( Qu_x[t] ).T.dot( Qu_u_i[t] ).dot( get_u( Qxu[t] ) )
+			Vx[t] = get_x( Qxu[t] ) - Qu_x[t].T.dot( Qu_u_i[t] ).dot( get_u( Qxu[t] ) )
 			
 			#	k_t = -Q_uut^-1 Q_ut
 			k[t] = -Qu_u_i[t].dot( get_u( Qxu[t] ) )
@@ -148,10 +148,10 @@ class LQR( object ):
 			# TODO check range
 
 			#  u_hat, x_hat are states of current trajectory
-			x_hat = x_vec[ -1, t, : ]
-			u_hat = u_vec[ -1, t, : ]
+			x_hat = xu_vec[ -1, t, :self.x_len ]
+			u_hat = xu_vec[ -1, t, self.x_len: ]
 
 			# return linear controllers
-			lin_controllers[t] = lin_gaussian_controller( u_hat, x_hat, k[t], K[t], -K[t] )
+			lin_controllers[t] = Lin_Gaussian_Controller( u_hat, x_hat, k[t], K[t], -K[t] )
 
 		return lin_controllers

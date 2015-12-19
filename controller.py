@@ -178,8 +178,8 @@ class CartPole( object ):
 
 		x0  = self.cost_params[ 'x0' ]
 		u0  = self.cost_params[ 'u0' ]
-		Wu  = self.cost_params[ 'Wx' ]
-		Wx  = self.cost_params[ 'Wu' ]
+		Wx  = self.cost_params[ 'Wx' ]
+		Wu  = self.cost_params[ 'Wu' ]
 
 		x_len = self.get_x_len()
 		u_len = self.get_u_len()
@@ -187,7 +187,7 @@ class CartPole( object ):
 		Wxu[ :x_len, :x_len ] = Wx
 		Wxu[ x_len:, x_len: ] = Wu
 
-		xu0 = np.conctatenate( (x0, u0) )
+		xu0 = np.concatenate( (x0, np.array( [u0] )) )
 		A_T_A_xu = Wxu.T + Wxu
 		A_T_A_x  = Wx.T + Wx
 
@@ -213,7 +213,7 @@ class CartPole( object ):
 		def lx_x( x ):
 			return A_T_A_x
 			
-		def lxu_xu( xu )
+		def lxu_xu( xu ):
 			return A_T_A_xu
 
 		return { 'l':l, 'lx': lx, 'lx_x': lx_x, 'lxu': lxu, 'lxu_xu': lxu_xu }

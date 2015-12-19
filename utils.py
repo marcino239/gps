@@ -16,7 +16,7 @@ class MVN( object ):
 		self.cov_ = cov
 
 		self.dim_ = mean.shape[ mean.ndim - 1 ]
-
+		
 		if A is None:
 			self.A_ = np.eye( self.dim_ )
 		else:
@@ -97,17 +97,18 @@ class MVN( object ):
 		
 	def log_params( self ):
 		" returns constant and matrix "
-		c, A = np.log( np.linalg.det( self.cov_ ) ) - self.dim_ * np.log( 2. * np.pi ), np.linalg.inv( self.cov_ )
-		return 0.5 * c, -0.5 * A, self.mean_
+		c = -np.log( np.linalg.det( self.cov_ ) ) - self.dim_ * np.log( 2. * np.pi )
+		P = -np.linalg.inv( self.cov_ )
+
+		return 0.5 * c, 0.5 * P, self.A_, self.mean_
 
 	def log( self, x ):
 		# returns log of probability distribution
-		d = x - self.mean_
-		c, A,  = self.log_params()
+		c, P, A, mean = self.log_params()
+		d = A.dot( x ) - mean
 
-		l = c + d.T.dot( A ).dot( d )
+		l = c + d.T.dot( P ).dot( d )
 		return l
-
 
 	
 class Lin_Gaussian_Estimator( object ):
@@ -116,7 +117,7 @@ class Lin_Gaussian_Estimator( object ):
 			Estimates linear gaussian dynamics in the form:
 			P( xt+1 | xt, ut ) = N( fxt xt + fut ut , Ft )
 		"""
-		pass
+		self.x_len = x_len
 
 
 	def fit( self, X_dynamics, var_ratio = 0.1, min_var = 0.1, num_gaussians=1 ):
@@ -130,24 +131,51 @@ class Lin_Gaussian_Estimator( object ):
 			x(t+1,k), x(t,k) are x_len long
 		"""
 
-		assert( X_dynamics.ndims == 3 )
-		assert( X_dynamics.shape[ 2 ] > x_len * 2 )
-
+		assert( X_dynamics.ndim == 2 )
+		assert( X_dynamics.shape[ 1 ] > self.x_len * 2 )
+		
 		lr = linear_model.LinearRegression( fit_intercept = False )
 		lr.fit( X_dynamics[ :, self.x_len: ], X_dynamics[ :, :self.x_len ] )
 		
-		self.fx = lr.coef_
-		self.fu = lr.intercept_
+		self.fxu = lr.coef_
+		self.fx = lr.coef_[ :self.x_len, :self.x_len ]
+		self.fu = lr.coef_[ self.x_len:, self.x_len ]
 				
 		if X_dynamics.shape[0] == 1:
-			self.F = np.diag( np.max( np.row_stack( ( X_dynamics[ 0, :x_len ] * var_ratio,
-														np.ones( x_len ) * min_var ) ), axis=0 ) )
+			self.F = np.diag( np.max( np.row_stack( ( X_dynamics[ :, :self.x_len ] * var_ratio,
+														np.ones( self.x_len ) * min_var ) ), axis=0 ) )
 		else:
 			# use GMM to estimate covariance
 			gmm = mixture.GMM( n_components=1, covariance_model='full' )
 			gmm.fit( X_dynamics )
 			
 			self.F = gmm.covar_[ 0, : ]
+		
+		# estimate p( ut | xt ) = N( k + K x, Q )
+		# print( 'calculate p( u|x ) from the regression below and return log of that to be used in lqr')
+
+		lr = linear_model.LinearRegression( fit_intercept = True )
+		lr.fit( X_dynamics[ :, 2*self.x_len: ], X_dynamics[ :, self.x_len:2*self.x_len] )
+		self.K = lr.coef_
+		self.k = lr.intercept_
+
+		if X_dynamics.shape[0] == 1:
+			self.Q = np.diag( np.max( np.row_stack( ( X_dynamics[ :, self.x_len:2*self.x_len ] * var_ratio,
+														np.ones( self.x_len ) * min_var ) ), axis=0 ) )
+		else:
+			# use GMM to estimate covariance
+			gmm = mixture.GMM( n_components=1, covariance_model='full' )
+			gmm.fit( X_dynamics[ :, self.x_len: ] )
+			
+			self.Q = gmm.covar_[ 0, : ]
+
+	def log_params( self ):
+		# the policy is represented as p( u|x ) = N( k + K*x, Q )
+		#
+		c = -np.log( np.linalg.det( self.Q ) ) - self.K.ndim * np.log( 2. * np.pi )
+		P = -np.linalg.inv( self.Q )   # precision matrix
+
+		return 0.5*c, 0.5*P, self.K, -self.k
 
 class Lin_Gaussian_Controller( object ):
 	"""
@@ -165,3 +193,4 @@ class Lin_Gaussian_Controller( object ):
 	
 	def controll( self, x ):
 		return self.mvn.rand() + self.K.dot( x )
+

@@ -59,8 +59,19 @@ class GPS( object ):
 
 		lqr = LQR( self.x_len, self.u_len )
 
+		# TODO run loop for K times or when error improvement is less than epsilon
 		for k in range( gps_params[ 'K'] ):
 			# optimise supervised learning
+			# TODO:
+			#   sample x, o from stored states and their coresponding observations
+			#   minimise objective function
+			#   use SGD to train
+			
+			# Questions:
+			#  how is covariance Cti estimated = this is covariance of p( ut | xt )
+			#  how is importance sampling utilized?
+			#  how is training data prepared?
+			
 
 			# optimise linear controllers using LQR
 			linear_controllers = lqr.LQR( xu_train, estimated_linear_controllers, system_cost, 1.0 )		# TODO add lagrange multipliers

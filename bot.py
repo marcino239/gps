@@ -5,6 +5,12 @@ import time
 import h5py
 
 USE_FORCE = 100.
+RUN_TIME  = 10
+FPS       = 20
+
+WHITE = (255, 255, 255)
+
+
 
 class DoublePendulum( object ):
 	M1 = 1.
@@ -97,9 +103,9 @@ class CartPole( object ):
 	mic = 5.
 	dt = 0.002
 
-	OVERSAMPLE = int( 1. / 0.002 / 60. )
+	OVERSAMPLE = int( 1. / 0.002 / FPS )
 	
-	MAX_RECORDS = int( 10.0 * 60. )
+	MAX_RECORDS = int( RUN_TIME * FPS )
 
 	def __init__( self ):
 		
@@ -148,32 +154,32 @@ class CartPole( object ):
 		x4 = x2 + 0.5
 		y4 = y2 - 0.5
 
-		x1i = x0i + int( x1 * width * 0.1 )
-		y1i = y0i + int( y1 * height * 0.1 )
+		x1i = x0i + int( x1 * width * 0.2 )
+		y1i = y0i + int( y1 * height * 0.2 )
 
-		x2i = x0i + int( x2 * width * 0.1 )
-		y2i = y0i + int( y2 * height * 0.1 )
+		x2i = x0i + int( x2 * width * 0.2 )
+		y2i = y0i + int( y2 * height * 0.2 )
 
-		x3i = x0i + int( x3 * width * 0.1 )
-		y3i = y0i + int( y3 * height * 0.1 )
+		x3i = x0i + int( x3 * width * 0.2 )
+		y3i = y0i + int( y3 * height * 0.2 )
 
-		x4i = x0i + int( x4 * width * 0.1 )
-		y4i = y0i + int( y4 * height * 0.1 )
+		x4i = x0i + int( x4 * width * 0.2 )
+		y4i = y0i + int( y4 * height * 0.2 )
 
 
 		# draw circles
-		pg.draw.circle( screen, (255, 255, 255), (x1i, y1i), 5, 0 ) 
+		pg.draw.circle( screen, WHITE, (x1i, y1i), 5, 0 ) 
 
 		# draw box
-		pg.draw.rect( screen, (255, 255, 255), (x3i, y3i, x3i - x4i, y3i - y4i), 2 )
+		pg.draw.rect( screen, WHITE, (x3i, y3i, x3i - x4i, y3i - y4i), 2 )
 
 		# draw line
-		pg.draw.line( screen, (255, 255, 255), (x1i, y1i), (x2i, y2i), 2 )
+		pg.draw.line( screen, WHITE, (x1i, y1i), (x2i, y2i), 2 )
 
 		# show recording time
-		if self.recording_on:
-			r = font.render( "R", True, pg.Color( 'Yellow' ) )
-			screen.blit( r, (0, 0) )
+#		if self.recording_on:
+#			r = font.render( "R", True, pg.Color( 'Yellow' ) )
+#			screen.blit( r, (0, 0) )
 
 	def start_recording( self ):
 		self.recording_on = False
@@ -204,10 +210,10 @@ class CartPole( object ):
 		x[2] = x[2] + CartPole.dt * x[3]
 
 
-	def save_data( self, fout_name ):
+	def save_data( self, fout_name, video_store ):
 		f = h5py.File( fout_name,  'w' )
 		f.create_dataset( 'x', data=self.records )
-		f.create_dataset( 'x_len', data=self.record_counter )
+		f.create_dataset( 'o', data=video_store )
 
 class App:
 
@@ -215,7 +221,7 @@ class App:
 		pg.init()
 		pg.font.init()
 
-		self.size = (1280, 480)
+		self.size = (227, 227)
 		self.title = "Bot control"
 		self.screen = None
 		self.running = False
@@ -229,7 +235,7 @@ class App:
 	def run(self, bottype, fout_name ):
 
 		#Display init
-		self.screen = pg.display.set_mode(self.size, pg.DOUBLEBUF | pg.HWSURFACE)
+		self.screen = pg.display.set_mode(self.size, pg.DOUBLEBUF | pg.HWSURFACE )
 		pg.display.set_caption(self.title)
 		pg.mouse.set_visible( True )
 		pg.key.set_repeat(200, 50)
@@ -239,7 +245,7 @@ class App:
 		if bottype == 'doublependulum':
 			controller = DoublePendulum( 1/-5., 5. )
 		elif bottype == 'cartpole':
-			controller = CartPole( 1/-5., 5. )
+			controller = CartPole( )
 		else:
 			print( 'unknown controller: ' + bottype )
 			return -1
@@ -247,10 +253,12 @@ class App:
 		width, height = self.screen.get_size()
 		x0i, y0i = width / 2, height / 2	
 
+		# video storage
+		max_frames = int( RUN_TIME * FPS )
+		video_store = np.empty( (max_frames, width, height ), dtype=np.int32 )
 
 		#Main loop
-		self.running = True
-		while self.running:
+		for i in range( max_frames ):
 
 			#Blitting
 			self.update()
@@ -262,13 +270,13 @@ class App:
 			for event in pg.event.get():
 				if event.type == pg.KEYDOWN:
 					if event.key == pg.K_LEFT:
-						label = self.font.render("KEY LEFT", 1, (255,255,0))
-						self.screen.blit( label, (100, 100))
+#						label = self.font.render("KEY LEFT", 1, (255,255,0))
+#						self.screen.blit( label, (100, 100))
 						u = -USE_FORCE
 
 					elif event.key == pg.K_RIGHT:
-						label = self.font.render("KEY RIGHT", 1, (255,255,0))
-						self.screen.blit( label, (300, 100))
+#						label = self.font.render("KEY RIGHT", 1, (255,255,0))
+#						self.screen.blit( label, (300, 100))
 						u = USE_FORCE
 
 					elif event.key == pg.K_r:
@@ -282,16 +290,16 @@ class App:
 
 			controller.step( u )
 			controller.update( self.font, self.screen )
+			video_store[ i, : ] = pg.surfarray.array2d( self.screen )
 
-
-		controller.save_data( fout_name )
+		controller.save_data( fout_name, video_store )
 
 
 	#Blitting
 	def update(self):
 
 		#FPS limit
-		self.clock.tick(60)
+		self.clock.tick( FPS )
 
 		#Show FPS
 		fps_count = str(int(self.clock.get_fps()))

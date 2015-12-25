@@ -19,10 +19,13 @@ gps_params_default = {
 						'num_gaussians': 	1,
 						'K':				1,
 						'epsilon':			1e-5,
+						'caffe_path':		'/home/user/work/caffe/python'
 					}
 
 
 def main( controller_type, training_data, policy_file, gps_params = gps_params_default ):
+	
+	sys.path.append( gps_params[ 'caffe_path' ] )
 	
 	# create controller
 	if controller_type == 'cartpole':
@@ -37,9 +40,6 @@ def main( controller_type, training_data, policy_file, gps_params = gps_params_d
 	gps_params[ 'u_len' ] = u_len
 
 	# load training data
-	# training data contains state and image data
-	# TODO: modify to deal with number of rollouts
-	
 	f = h5py.File( 'data.h5', 'r' )
 	xu_train_orig = f[ 'x' ].value
 	
